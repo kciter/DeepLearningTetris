@@ -1,5 +1,6 @@
 import pygame, sys, random
 from pygame.locals import *
+from random import choice
 
 class Piece:
     O = (((0,0,0,0,0), (0,0,0,0,0),(0,0,1,1,0),(0,0,1,1,0),(0,0,0,0,0)),) * 4
@@ -58,6 +59,8 @@ class Board:
                      'bottom': 3, 'overlap': 4}
 
     def __init__(self, screen):
+        pygame.font.init()
+        self.score = 0
         self.screen = screen
         self.width = 10
         self.height = 22
@@ -66,9 +69,12 @@ class Board:
         for _ in xrange(self.height):
             self.board.append([0] * self.width)
         self.generate_piece()
+        self.set_next_piece()
 
-    def generate_piece(self):
-        self.piece = Piece()
+        self.droped = False
+
+    def generate_piece(self, piece_name = None):
+        self.piece = Piece(piece_name)
         self.piece_x, self.piece_y = 3, 0
 
     def absorb_piece(self):
@@ -76,7 +82,9 @@ class Board:
             for x, block in enumerate(row):
                 if block:
                     self.board[y+self.piece_y][x+self.piece_x] = block
-        self.generate_piece()
+
+        self.generate_piece(self.next_piece)
+        self.set_next_piece()
 
     def _block_collide_with_board(self, x, y):
         if x < 0: 
@@ -98,6 +106,30 @@ class Board:
                     if collide:
                         return collide
         return Board.COLLIDE_ERROR['no_error']
+
+    def get_stack_height(self):
+        stack_height = 0
+        for i in range(0, self.height):
+            blank_row = True
+            for j in range(0, self.width):
+                if self.board[i][j] != 0:
+                    blank_row = False
+            if not blank_row:
+                stack_height = self.height - i
+                break
+        return stack_height
+
+    def get_blank_blocks(self):
+        blank_blocks = 0
+        for i in range(0, self.height):
+            for j in range(0, self.width):
+                if self.board[i][j] != 0:
+                    blank_blocks += 1
+
+        return blank_blocks
+
+    def set_next_piece(self):
+        self.next_piece = choice(['O', 'I', 'L', 'J', 'Z', 'S', 'T'])
 
     def _can_move_piece(self, dx, dy):
         dx_ = self.piece_x + dx
@@ -139,9 +171,11 @@ class Board:
     def drop_piece(self):
         if self._can_drop_piece():
             self.move_piece(dx=0, dy=1)
+            self.droped = False
         else:
             self.absorb_piece()
             self.delete_lines()
+            self.droped = True
 
     def full_drop_piece(self):
         while self._can_drop_piece():
@@ -160,13 +194,16 @@ class Board:
 
     def delete_lines(self):
         remove = [y for y, row in enumerate(self.board) if all(row)]
+        count = 0
         for y in remove:
+            count += 1
+            self.score += 1000 * count
             self._delete_line(y)    
 
     def game_over(self):
         return sum(self.board[0]) > 0 or sum(self.board[1]) > 0
 
-    def draw_blocks(self, array2d, color=(0,0,255), dx=0, dy=0):
+    def draw_blocks(self, array2d, color=(255,255,255), dx=0, dy=0):
         for y, row in enumerate(array2d):
             y += dy
             if y >= 2 and y < self.height:
@@ -185,7 +222,21 @@ class Board:
                                             self.block_size,
                                             self.block_size), 1)
 
+    def draw_ui(self):
+        pygame.draw.rect(self.screen, (255, 255, 255),
+                            (250, 0, 2, 500), 1)
+
+        font = pygame.font.Font(None, 30)
+        score_text = font.render("SCORE: " + str(self.score), 1, (255,255,0))
+        self.screen.blit(score_text, (270, 10))
+
+        next_block_text = font.render("Next block", 1, (255,255,255))
+        self.screen.blit(next_block_text, (270, 50))
+
+        self.draw_blocks(Piece(self.next_piece), dx=10, dy=5)
+    
     def draw(self):
+        self.draw_ui()
         self.draw_blocks(self.piece, dx=self.piece_x, dy=self.piece_y)
         self.draw_blocks(self.board)
 
@@ -193,20 +244,24 @@ class Tetris:
     DROP_EVENT = USEREVENT + 1
 
     def __init__(self):
-        self.screen = pygame.display.set_mode((250, 500))
+        self.screen = pygame.display.set_mode((400, 500))
         self.clock = pygame.time.Clock()
         self.board = Board(self.screen)
+        pygame.init()
+        pygame.time.set_timer(self.DROP_EVENT, 500)
+
+        self.saved_height = 0
 
     def handle_key(self, event_key):
-        if event_key == K_DOWN:
+        if event_key == K_DOWN or event_key == 0:
             self.board.drop_piece()
-        elif event_key == K_LEFT:
+        elif event_key == K_LEFT or event_key == 1:
             self.board.move_piece(dx=-1, dy=0)
-        elif event_key == K_RIGHT:
+        elif event_key == K_RIGHT or event_key == 2:
             self.board.move_piece(dx=1, dy=0)
-        elif event_key == K_UP:
+        elif event_key == K_UP or event_key == 3:
             self.board.rotate_piece()
-        elif event_key == K_SPACE:
+        elif event_key == K_SPACE or event_key == 4:
             self.board.full_drop_piece()
         elif event_key == K_ESCAPE:
             self.pause()
@@ -223,10 +278,12 @@ class Tetris:
         pygame.time.set_timer(Tetris.DROP_EVENT, 500)
 
         while True:
+            old_score = self.board.score
             if self.board.game_over():
-                print "Game over"
-                pygame.quit()
-                sys.exit()
+                print "Game over and restart"
+                self.board = Board(self.screen)
+                #pygame.quit()
+                #sys.exit()
             self.screen.fill((0, 0, 0))
             for event in pygame.event.get():
                 if event.type == QUIT:
@@ -241,6 +298,43 @@ class Tetris:
             pygame.display.update()
             self.clock.tick(60)
 
+            if self.board._can_drop_piece():
+                print 1
+
+    def step(self, key_event):
+        old_score = self.board.score
+        reward = 0
+        gameover = False
+
+        self.screen.fill((0, 0, 0))
+        self.handle_key(key_event)
+
+        self.board.draw()
+
+        pygame.display.update()
+        self.clock.tick(600)
+
+        for event in pygame.event.get():
+            if event.type == self.DROP_EVENT:
+                self.board.drop_piece()
+
+        image_data = pygame.surfarray.array3d(pygame.display.get_surface())
+
+        if self.board.droped == True:
+            reward = self.saved_height - self.board.get_stack_height()
+            self.saved_height = self.board.get_stack_height()
+
+        if self.board.game_over():
+            print "Game over and restart"
+            self.board = Board(self.screen)
+            reward = -200
+            gameover = True
+            return image_data, reward, gameover
+
+        if old_score < self.board.score:
+            reward = self.board.score - old_score
+
+        return image_data, reward, gameover
 
 if __name__ == "__main__":
     Tetris().run()
