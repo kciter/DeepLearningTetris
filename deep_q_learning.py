@@ -16,7 +16,7 @@ GAMMA = 0.99 # decay rate of past observations
 OBSERVE = 50. # timesteps to observe before training
 EXPLORE = 1. # frames over which to anneal epsilon
 FINAL_EPSILON = 0.1 # final value of epsilon
-INITIAL_EPSILON = 0.386 # starting value of epsilon
+INITIAL_EPSILON = 1.0 # starting value of epsilon
 REPLAY_MEMORY = 590000 # number of previous transitions to remember
 BATCH = 32 # size of minibatch
 FRAME_PER_ACTION = 1
@@ -113,8 +113,22 @@ def trainNetwork(s, readout, h_fc1, sess):
         key_event = 0
         if random.random() <= epsilon or t <= OBSERVE:
             # key_event = random.choice([K_LEFT, K_RIGHT, K_UP, K_DOWN, K_SPACE, 0])
-            key_event = random.randrange(ACTIONS)
-            a_t[random.randrange(ACTIONS)] = 1
+            key_event = 5
+            for event in pygame.event.get():
+                if event.type == KEYDOWN:
+                    if event.key == K_DOWN:
+                        key_event = 0
+                    elif event.key == K_LEFT:
+                        key_event = 1
+                    elif event.key == K_RIGHT:
+                        key_event = 2
+                    elif event.key == K_UP:
+                        key_event = 3
+                    elif event.key == K_SPACE:
+                        key_event = 4
+
+            # key_event = random.randrange(ACTIONS)
+            a_t[key_event] = 1
         else:
             key_event = np.argmax(readout_t)
             a_t[key_event] = 1

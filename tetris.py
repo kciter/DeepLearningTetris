@@ -274,9 +274,6 @@ class Tetris:
                     running = False
 
     def run(self):
-        pygame.init()
-        pygame.time.set_timer(Tetris.DROP_EVENT, 500)
-
         while True:
             old_score = self.board.score
             if self.board.game_over():
@@ -312,7 +309,7 @@ class Tetris:
         self.board.draw()
 
         pygame.display.update()
-        self.clock.tick(600)
+        self.clock.tick(60)
 
         for event in pygame.event.get():
             if event.type == self.DROP_EVENT:
